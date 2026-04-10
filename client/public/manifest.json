@@ -1,0 +1,17 @@
+{
+  "name": "AiAutoPricingScanner",
+  "short_name": "PriceScan",
+  "description": "AI-powered pricing scanner for collectibles, cards, vintage items and sports memorabilia",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#6366f1",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
