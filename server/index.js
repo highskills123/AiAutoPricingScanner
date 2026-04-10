@@ -3,9 +3,27 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Rate limiters
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+const scanLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many scan requests, please wait before scanning again.' },
+});
 
 // Middleware
 app.use(cors({
@@ -26,8 +44,8 @@ app.use('/uploads', express.static(uploadsDir));
 const scanRouter = require('./routes/scan');
 const marketplaceRouter = require('./routes/marketplace');
 
-app.use('/api/scan', scanRouter);
-app.use('/api/marketplace', marketplaceRouter);
+app.use('/api/scan', scanLimiter, scanRouter);
+app.use('/api/marketplace', generalLimiter, marketplaceRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -48,7 +66,7 @@ app.get('/api/health', (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
   app.use(express.static(clientBuildPath));
-  app.get('*', (req, res) => {
+  app.get('*', generalLimiter, (req, res) => {
     res.sendFile(path.join(clientBuildPath, 'index.html'));
   });
 }

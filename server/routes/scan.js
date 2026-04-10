@@ -9,17 +9,24 @@ const db = require('../db/database');
 
 const router = express.Router();
 
+const UPLOADS_DIR = path.resolve(path.join(__dirname, '..', 'uploads'));
+
+// Ensure uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
 // Configure multer for image uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '..', 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
+    cb(null, UPLOADS_DIR);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
+    // Always use a UUID filename to prevent path injection — never trust
+    // the original filename provided by the client.
+    const ext = /\.(jpe?g|png|gif|webp|bmp|tiff?)$/i.test(file.originalname)
+      ? path.extname(file.originalname).toLowerCase()
+      : '.jpg';
     cb(null, `${uuidv4()}${ext}`);
   },
 });
@@ -48,11 +55,17 @@ router.post('/', upload.single('image'), async (req, res) => {
 
     const sessionId = req.headers['x-session-id'] || uuidv4();
     const imageFile = req.file;
-    const imagePath = imageFile.path;
 
-    // Read image as base64
-    const imageBase64 = fs.readFileSync(imagePath).toString('base64');
-    const imageUrl = `/uploads/${imageFile.filename}`;
+    // Build the safe file path solely from our trusted UPLOADS_DIR and the
+    // basename of the filename (which multer sets to a UUID we generated).
+    // We never use imageFile.path directly in file-system calls to avoid
+    // any possibility of path traversal through user-controlled data.
+    const safeFilename = path.basename(imageFile.filename);
+    const safeImagePath = path.join(UPLOADS_DIR, safeFilename);
+
+    // Read image as base64 using the sanitized path
+    const imageBase64 = fs.readFileSync(safeImagePath).toString('base64');
+    const imageUrl = `/uploads/${safeFilename}`;
 
     // Analyze image
     let analysisResult;
